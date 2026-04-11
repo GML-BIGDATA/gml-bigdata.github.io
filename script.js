@@ -11,17 +11,18 @@
     const res = await fetch('content.md');
     md = await res.text();
   } catch (e) {
-    document.getElementById('app').innerHTML = '<p style="padding:80px;text-align:center;color:#999;">无法加载 content.md</p>';
+    document.getElementById('app').innerHTML =
+      '<p style="padding:80px;text-align:center;color:#999;">无法加载 content.md</p>';
     return;
   }
 
-  // ---- Simple Markdown parser ----
+  // ---- Markdown Parser ----
+
   function parseMD(text) {
     const lines = text.split('\n');
     const sections = [];
-
-    // Split by h2 (---) boundaries
     let current = { heading: '', content: [] };
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
@@ -45,11 +46,10 @@
     if (current.heading || current.content.length) {
       sections.push(current);
     }
-
     return sections;
   }
 
-  // Parse key-value pairs from list items
+  // Parse key-value pairs from list items (- **key**: value)
   function parseKV(lines) {
     const obj = {};
     lines.forEach(l => {
@@ -66,7 +66,7 @@
       .map(l => l.trim().replace(/^- /, ''));
   }
 
-  // Split content blocks by h3/h4
+  // Split content blocks by sub-headers
   function splitByHeader(lines, prefix) {
     const blocks = [];
     let block = null;
@@ -82,23 +82,20 @@
     return blocks;
   }
 
-  // ---- Render functions ----
+  // ---- Renderers ----
 
   function renderHero(section) {
     const lines = section.content;
     let quote = '';
-    let tableRows = [];
+    let stats = [];
 
     // Extract blockquote
-    const bqStart = lines.findIndex(l => l.startsWith('> '));
-    if (bqStart >= 0) {
-      quote = lines[bqStart].replace(/^> /, '');
-    }
+    const bqLine = lines.find(l => l.startsWith('> '));
+    if (bqLine) quote = bqLine.replace(/^> /, '');
 
     // Extract table (stats)
     const tblStart = lines.findIndex(l => l.includes('|'));
     if (tblStart >= 0) {
-      // Find all table lines
       const tblLines = [];
       for (let i = tblStart; i < lines.length; i++) {
         if (lines[i].includes('|')) tblLines.push(lines[i]);
@@ -107,20 +104,24 @@
       if (tblLines.length >= 2) {
         const headers = tblLines[0].split('|').map(s => s.trim()).filter(Boolean);
         const values = tblLines[tblLines.length - 1].split('|').map(s => s.trim()).filter(Boolean);
-        tableRows = headers.map((h, i) => ({ label: h, value: values[i] || '' }));
+        stats = headers.map((h, i) => ({ label: h, value: values[i] || '' }));
       }
     }
 
     let html = `<section class="hero" id="hero">
-      <h1>${section.heading.replace(/大数据/, '<em>大数据</em>')}</h1>
+      <h1>${section.heading.replace(/大数据/, '<em>大数据</em>')}
+      </h1>
       <blockquote>${quote}</blockquote>`;
 
-    if (tableRows.length) {
-      html += '<table><tr>';
-      tableRows.forEach(r => html += `<th>${r.label}</th>`);
-      html += '</tr><tr>';
-      tableRows.forEach(r => html += `<td>${r.value}</td>`);
-      html += '</tr></table>';
+    if (stats.length) {
+      html += '<div class="hero-stats">';
+      stats.forEach(s => {
+        html += `<div class="hero-stat">
+          <div class="number">${s.value}</div>
+          <div class="label">${s.label}</div>
+        </div>`;
+      });
+      html += '</div>';
     }
 
     html += '</section>';
@@ -135,7 +136,10 @@
 
     blocks.forEach(b => {
       const kv = parseKV(b.lines);
-      const desc = b.lines.filter(l => l.trim() && !l.trim().startsWith('- ') && !l.trim().startsWith('###')).join(' ').trim();
+      const desc = b.lines
+        .filter(l => l.trim() && !l.trim().startsWith('- ') && !l.trim().startsWith('###'))
+        .join(' ')
+        .trim();
       const tags = (kv['标签'] || '').split(' / ');
 
       html += `<div class="card">
@@ -167,7 +171,7 @@
       const hasImg = photo && !photo.includes('img/');
       const photoHTML = photo && !hasImg
         ? `<img src="${photo}" alt="${b.title}">`
-        : `<span style="font-size:2.4rem;opacity:0.3;">👤</span>`;
+        : `<span style="font-size:2.4rem;opacity:0.25;">👤</span>`;
 
       html += `<div class="member-card">
         <div class="member-photo">
@@ -199,7 +203,9 @@
         const papers = splitByHeader(sub.lines, '####');
         papers.forEach(p => {
           const kv = parseKV(p.lines);
-          const authors = (kv['作者'] || '').replace(/\*\*/g, '<strong>').replace(/\*\*/g, '</strong>');
+          const authors = (kv['作者'] || '')
+            .replace(/\*\*/g, '<strong>')
+            .replace(/\*\*/g, '</strong>');
           const venue = kv['会议'] || '';
           const plinks = (kv['链接'] || '').split(' / ');
 
@@ -208,7 +214,9 @@
             <h3>${p.title}</h3>
             <div class="authors">${authors}</div>
             <span class="venue">${venue}</span>
-            <div class="pub-links">${plinks.map(l => `<a href="#">${l}</a>`).join('')}</div>
+            <div class="pub-links">
+              ${plinks.map(l => `<a href="#">${l}</a>`).join('')}
+            </div>
           </div>`;
         });
       }
@@ -218,16 +226,20 @@
         html += '<div class="grid-2" style="margin-top:16px;">';
         projects.forEach(p => {
           const kv = parseKV(p.lines);
-          // Get description: last non-kv line
-          const descLine = p.lines.filter(l => {
-            const trimmed = l.trim();
-            return trimmed && !trimmed.startsWith('- **') && !trimmed.startsWith('####');
-          }).join(' ').trim();
+          const descLine = p.lines
+            .filter(l => {
+              const t = l.trim();
+              return t && !t.startsWith('- **') && !t.startsWith('####');
+            })
+            .join(' ')
+            .trim();
           const tags = (kv['标签'] || '').split(' / ');
           const isActive = (kv['状态'] || '').includes('进行中');
 
           html += `<div class="project-card">
-            <div class="status"><span class="dot${isActive ? '' : ' done'}"></span>${kv['状态'] || ''}</div>
+            <div class="status">
+              <span class="dot${isActive ? '' : ' done'}"></span>${kv['状态'] || ''}
+            </div>
             <h3>${p.title}</h3>
             <p class="desc">${descLine}</p>
             <div class="tags">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
@@ -247,18 +259,15 @@
       <h2 class="section-title">${section.heading}</h2>
       <div class="talent-cols">`;
 
-    blocks.forEach((b, i) => {
+    blocks.forEach(b => {
       const items = parseList(b.lines);
       html += `<div class="talent-card">
         <h3>${b.title}</h3>
         <ul>${items.map(it => `<li>${it}</li>`).join('')}</ul>
       </div>`;
-
-      // Close grid after 2 items, then use full-width
-      if (i === 1) html += '</div>';
     });
 
-    html += '</section>';
+    html += '</div></section>';
     return html;
   }
 
@@ -320,17 +329,15 @@
       ? `<div class="contact-note">${bq.replace(/^> \*\*[^*]+\*\*\s*:\s*/, '<strong>招生信息：</strong>')}</div>`
       : '';
 
-    let html = `<section class="section" id="contact">
+    return `<section class="section" id="contact">
       <h2 class="section-title">${section.heading}</h2>
       <div class="contact-grid">
         <div class="contact-card">
           <h3>联系方式</h3>
           ${items.map(it => `
             <div class="contact-item">
-              <div>
-                <div class="label">${it.label}</div>
-                <div class="value">${it.value}</div>
-              </div>
+              <div class="label">${it.label}</div>
+              <div class="value">${it.value}</div>
             </div>
           `).join('')}
         </div>
@@ -339,11 +346,9 @@
         </div>
       </div>
     </section>`;
-
-    return html;
   }
 
-  // ---- Route sections to renderers ----
+  // ---- Section → Renderer mapping ----
   const renderers = {
     '研究方向': renderResearch,
     '团队成员': renderMembers,
@@ -353,16 +358,17 @@
     '联系我们': renderContact,
   };
 
-  // ---- Main ----
+  // ---- Main render ----
   const sections = parseMD(md);
   let pageHTML = '';
 
   sections.forEach(sec => {
-    if (sec.heading === 'GML BigData Research Group' || sec.heading.includes('GML')) {
+    // Hero section
+    if (sec.heading.includes('GML') || sec.heading.includes('Research Group')) {
       pageHTML += renderHero(sec);
       return;
     }
-    // Find matching renderer
+    // Match section to renderer
     for (const [key, fn] of Object.entries(renderers)) {
       if (sec.heading.includes(key)) {
         pageHTML += fn(sec);
@@ -374,11 +380,11 @@
   document.getElementById('app').innerHTML = pageHTML;
 
   // ---- Active nav on scroll ----
-  const navAnchors = document.querySelectorAll('.nav-links a');
+  const navAnchors = document.querySelectorAll('.masthead-nav a');
   const sectionEls = document.querySelectorAll('section[id]');
 
   function updateNav() {
-    const y = window.scrollY + 100;
+    const y = window.scrollY + 120;
     sectionEls.forEach(sec => {
       const top = sec.offsetTop;
       const h = sec.offsetHeight;
@@ -391,14 +397,15 @@
     });
   }
   window.addEventListener('scroll', updateNav, { passive: true });
+  updateNav();
 
   // ---- Mobile nav toggle ----
-  const toggle = document.querySelector('.nav-toggle');
-  const links = document.querySelector('.nav-links');
+  const toggle = document.querySelector('.masthead-toggle');
+  const navEl = document.querySelector('.masthead-nav');
   if (toggle) {
-    toggle.addEventListener('click', () => links.classList.toggle('open'));
-    links.querySelectorAll('a').forEach(a => {
-      a.addEventListener('click', () => links.classList.remove('open'));
+    toggle.addEventListener('click', () => navEl.classList.toggle('open'));
+    navEl.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => navEl.classList.remove('open'));
     });
   }
 
