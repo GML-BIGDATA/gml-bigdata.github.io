@@ -137,7 +137,11 @@
     blocks.forEach(b => {
       const kv = parseKV(b.lines);
       const desc = b.lines
-        .filter(l => l.trim() && !l.trim().startsWith('- ') && !l.trim().startsWith('###'))
+        .filter(l => {
+          const t = l.trim();
+          return t && !t.startsWith('- **') && !t.startsWith('###');
+        })
+        .map(l => l.trim().replace(/^- /, ''))
         .join(' ')
         .trim();
       const tags = (kv['标签'] || '').split(' / ');
@@ -223,7 +227,7 @@
 
       if (sub.title.includes('课题')) {
         const projects = splitByHeader(sub.lines, '####');
-        html += '<div class="grid-2" style="margin-top:16px;">';
+        html += '<div class="grid-2" style="margin-top:16px; gap:1em;">';
         projects.forEach(p => {
           const kv = parseKV(p.lines);
           const descLine = p.lines
@@ -354,7 +358,6 @@
     '团队成员': renderMembers,
     '研究成果': renderPublications,
     '人才培养': renderTalent,
-    '团队文化与展望': renderCulture,
     '联系我们': renderContact,
   };
 
