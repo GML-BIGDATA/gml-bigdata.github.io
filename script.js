@@ -212,16 +212,26 @@
             .replace(/\*\*/g, '</strong>');
           const venue = kv['会议'] || '';
           const plinks = (kv['链接'] || '').split(' / ');
+          const image = kv['图片'] || '';
+          const hasImage = image && !image.startsWith('#');
 
-          html += `<div class="pub-item">
-            <div class="year">${kv['年份'] || ''}</div>
-            <h3>${p.title}</h3>
-            <div class="authors">${authors}</div>
-            <span class="venue">${venue}</span>
-            <div class="pub-links">
-              ${plinks.map(l => `<a href="#">${l}</a>`).join('')}
-            </div>
-          </div>`;
+          const linksHTML = plinks.filter(l => l).map(l => `<a href="#">${l}</a>`).join('');
+
+          const textHTML = '<div class="pub-text">' +
+            '<div class="year">' + (kv['年份'] || '') + '</div>' +
+            '<h3>' + p.title + '</h3>' +
+            '<div class="authors">' + authors + '</div>' +
+            '<span class="venue">' + venue + '</span>' +
+            (linksHTML ? '<div class="pub-links">' + linksHTML + '</div>' : '') +
+            '</div>';
+
+          const imgHTML = hasImage
+            ? '<div class="pub-image"><img src="' + image + '" alt="' + p.title + '"></div>'
+            : '';
+
+          html += '<div class="pub-item' + (hasImage ? ' pub-with-image' : '') + '">' +
+            textHTML + imgHTML +
+            '</div>';
         });
       }
 
